@@ -1,0 +1,16 @@
+steps:
+  # Install dependencies
+  - name: 'gcr.io/cloud-builders/npm'
+    args: ['install']
+
+  # Build the application
+  - name: 'gcr.io/cloud-builders/npm'
+    args: ['run', 'build']
+    env:
+      - 'NODE_ENV=production'
+
+  # Deploy to Firebase Hosting
+  - name: 'gcr.io/$PROJECT_ID/firebase'
+    args: ['deploy', '--only', 'hosting', '--project', '$PROJECT_ID']
+
+timeout: 600s

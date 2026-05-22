@@ -5,37 +5,43 @@
 }
 
 .add-child h2 {
-    color: #1a202c;
-    margin-bottom: 10px;
-    font-size: 28px;
-    font-weight: 700;
+    color: rgba(255, 255, 255, 0.96);
+    margin-bottom: 6px;
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
 }
 
 .form-description {
-    color: #718096;
+    color: rgba(255, 255, 255, 0.65);
     margin-bottom: 30px;
     font-size: 15px;
     line-height: 1.6;
+    padding-bottom: 20px;
+    border-bottom: 2px dashed rgba(255, 255, 255, 0.15);
 }
 
 .child-form {
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     padding: 40px;
-    border-radius: 16px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 10px 20px rgba(0, 0, 0, 0.08);
-    border: 1px solid #e2e8f0;
+    border-radius: 24px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-top: 4px solid rgba(255, 255, 255, 0.4);
 }
 
 .form-section-header {
     margin: 40px 0 25px 0;
     padding-top: 30px;
-    border-top: 2px solid #e2e8f0;
+    border-top: 2px dashed rgba(255, 255, 255, 0.15);
 }
 
 .form-section-header h3 {
-    color: #2d3748;
-    font-size: 20px;
-    font-weight: 600;
+    color: rgba(255, 255, 255, 0.96);
+    font-size: 18px;
+    font-weight: 700;
     margin-bottom: 8px;
     display: flex;
     align-items: center;
@@ -44,12 +50,12 @@
 
 .form-section-header h3::before {
     content: '📄';
-    font-size: 24px;
+    font-size: 22px;
 }
 
 .section-description {
-    color: #718096;
-    font-size: 14px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 13px;
     margin-bottom: 20px;
     line-height: 1.5;
 }
@@ -62,16 +68,17 @@
 }
 
 .form-group {
-    margin-bottom: 24px;
+    margin-bottom: 20px;
 }
 
 .form-group label {
     display: block;
-    margin-bottom: 10px;
-    color: #2d3748;
-    font-weight: 600;
-    font-size: 14px;
-    letter-spacing: 0.3px;
+    margin-bottom: 6px;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
 }
 
 .form-group input[type="text"],
@@ -79,56 +86,56 @@
 .form-group input[type="number"],
 .form-group select {
     width: 100%;
-    padding: 12px 16px;
-    border: 2px solid #e2e8f0;
-    border-radius: 8px;
-    font-size: 15px;
-    transition: all 0.3s ease;
-    background-color: #ffffff;
+    padding: 12px 20px;
+    border: 1.5px solid rgba(255, 255, 255, 0.18);
+    border-radius: 50px;
+    font-size: 14px;
+    font-family: inherit;
+    background-color: rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.95);
+    transition: all 0.2s ease;
     box-sizing: border-box;
 }
 
-.form-group input[type="text"]:hover,
-.form-group input[type="date"]:hover,
-.form-group input[type="number"]:hover,
-.form-group select:hover {
-    border-color: #cbd5e0;
+.form-group input[type="text"]:focus,
+.form-group input[type="date"]:focus,
+.form-group input[type="number"]:focus,
+.form-group select:focus {
+    outline: none;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.1);
 }
 
 .form-group input[type="file"] {
     width: 100%;
-    padding: 12px 16px;
-    border: 2px dashed #cbd5e0;
-    border-radius: 8px;
+    padding: 12px 20px;
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+    border-radius: 16px;
     font-size: 14px;
-    background-color: #f7fafc;
+    font-family: inherit;
+    background-color: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.8);
     cursor: pointer;
     transition: all 0.3s ease;
 }
 
 .form-group input[type="file"]:hover {
-    background-color: #edf2f7;
-    border-color: #a0aec0;
-}
-
-.form-group input:focus,
-.form-group select:focus {
-    outline: none;
-    border-color: #4299e1;
-    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+    background-color: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.5);
 }
 
 .form-group small {
     display: block;
     margin-top: 6px;
-    color: #718096;
-    font-size: 13px;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 12px;
     line-height: 1.4;
 }
 
 .file-selected {
-    color: #38a169 !important;
-    font-weight: 600;
+    color: #4ade80 !important;
+    font-weight: 700;
     margin-top: 10px !important;
     display: flex;
     align-items: center;
@@ -141,55 +148,54 @@
 }
 
 .success-message {
-    background-color: #c6f6d5;
-    color: #22543d;
+    background-color: rgba(16, 185, 129, 0.18);
+    color: #6ee7b7;
     padding: 16px 20px;
-    border-radius: 10px;
+    border-radius: 16px;
     margin-bottom: 24px;
-    border-left: 4px solid #38a169;
-    box-shadow: 0 2px 4px rgba(56, 161, 105, 0.1);
+    border-left: 4px solid #10b981;
+    font-weight: 600;
 }
 
 .error-message {
-    background-color: #fed7d7;
-    color: #742a2a;
+    background-color: rgba(239, 68, 68, 0.18);
+    color: #fca5a5;
     padding: 16px 20px;
-    border-radius: 10px;
+    border-radius: 16px;
     margin-bottom: 24px;
-    border-left: 4px solid #e53e3e;
-    box-shadow: 0 2px 4px rgba(229, 62, 62, 0.1);
-    font-weight: 500;
+    border-left: 4px solid #ef4444;
+    font-weight: 600;
 }
 
 .form-actions {
     margin-top: 40px;
     padding-top: 30px;
-    border-top: 1px solid #e2e8f0;
+    border-top: 2px dashed rgba(255, 255, 255, 0.15);
     text-align: center;
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%);
+    background: linear-gradient(135deg, #1a6de0, #3d96f6);
     color: white;
-    padding: 14px 48px;
+    padding: 14px 52px;
     border: none;
-    border-radius: 10px;
-    font-size: 16px;
-    font-weight: 600;
+    border-radius: 50px;
+    font-size: 15px;
+    font-weight: 700;
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 6px rgba(66, 153, 225, 0.2);
-    letter-spacing: 0.5px;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 15px rgba(26, 109, 224, 0.4);
+    letter-spacing: 0.3px;
+    font-family: inherit;
 }
 
 .btn-primary:hover:not(:disabled) {
-    background: linear-gradient(135deg, #3182ce 0%, #2c5282 100%);
+    box-shadow: 0 6px 24px rgba(26, 109, 224, 0.55);
     transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(66, 153, 225, 0.3);
 }
 
 .btn-primary:disabled {
-    background: #cbd5e0;
+    background: rgba(255, 255, 255, 0.15);
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
@@ -219,25 +225,17 @@
     }
 }
 
-/* Additional visual enhancements */
 .form-group select option {
+    background: #1249a8;
+    color: white;
     padding: 10px;
 }
 
 .form-group input::placeholder {
-    color: #a0aec0;
+    color: rgba(255, 255, 255, 0.35);
 }
 
-/* Smooth loading state */
 @keyframes pulse {
-    0%, 100% {
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.5;
-    }
-}
-
-.btn-primary:disabled {
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
 }

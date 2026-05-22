@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { parentAPI, tripAPI, paymentAPI } from '../../services/api';
 import MockPayment from './MockPayment';
+import { showToast } from '../../utils/toast';
 
 const TripsList = ({ children, parentId }) => {
     const { user } = useAuth();
@@ -73,7 +74,7 @@ const TripsList = ({ children, parentId }) => {
     };
 
     const handlePaymentSuccess = (paymentData) => {
-        alert('Payment successful! Your child is now registered for the trip.');
+        showToast('Payment successful! Your child is now registered for the trip.', 'success');
         setShowPaymentModal(false);
         setSelectedTrip(null);
         setSelectedStudent(null);
@@ -90,25 +91,17 @@ const TripsList = ({ children, parentId }) => {
 
     if (authError || !hasApprovedStudents) {
         return (
-            <div className="trips-list">
-                <h2>School Trips</h2>
-                <div className="auth-error-message" style={{
-                    padding: '30px',
-                    textAlign: 'center',
-                    backgroundColor: '#fff3cd',
-                    border: '1px solid #ffc107',
-                    borderRadius: '8px',
-                    marginTop: '20px'
-                }}>
-                    <div style={{ fontSize: '60px', marginBottom: '20px' }}>🚌</div>
-                    <h3 style={{ color: '#856404', marginBottom: '15px' }}>⚠️ No Approved Students</h3>
-                    <p style={{ color: '#856404', fontSize: '16px', marginBottom: '15px' }}>
+            <div className="page-wrapper">
+                <div className="page-header">
+                    <div><h1 className="page-title">School Trips</h1></div>
+                </div>
+                <div className="empty-state" style={{ borderTop: '4px solid #f59e0b' }}>
+                    <div className="empty-icon">🚌</div>
+                    <h3 style={{ color: '#92400e' }}>No Approved Students</h3>
+                    <p style={{ color: '#92400e' }}>
                         {children && children.length > 0
-                            ? 'Your child application(s) are pending approval. You cannot register for trips until at least one child is approved.'
+                            ? 'Your child application(s) are pending approval. Trip registration is available once a child is approved.'
                             : 'You have no registered children. Please add a child first.'}
-                    </p>
-                    <p style={{ color: '#666', fontSize: '14px', marginBottom: '20px' }}>
-                        Trip registration is only available for parents with approved students.
                     </p>
                 </div>
             </div>
@@ -116,8 +109,13 @@ const TripsList = ({ children, parentId }) => {
     }
 
     return (
-        <div className="trips-list">
-            <h2>School Trips</h2>
+        <div className="page-wrapper">
+            <div className="page-header">
+                <div>
+                    <h1 className="page-title">School Trips</h1>
+                    <p className="page-subtitle">Browse and register your child for upcoming excursions</p>
+                </div>
+            </div>
 
             {error && !authError && <div className="error-message">{error}</div>}
 

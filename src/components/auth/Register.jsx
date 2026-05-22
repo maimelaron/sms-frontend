@@ -1,280 +1,228 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authAPI } from '../../services/api';
+import logo from '../../assets/logo.svg';
 
 const Register = () => {
     const [formData, setFormData] = useState({
-        email: '',
-        password: '',
-        confirmPassword: '',
-        fullName: '',
-        phoneNumber: '',
-        address: '',
-        role: 'PARENT'
+        email: '', password: '', confirmPassword: '', fullName: '', phoneNumber: '', role: 'PARENT'
     });
-    const [error, setError] = useState('');
-    const [passwordStrength, setPasswordStrength] = useState('');
+    const [addressFields, setAddressFields] = useState({ street: '', city: '', province: '', postalCode: '' });
+    const [errors, setErrors] = useState({});
+    const [passwordStrength, setPasswordStrength] = useState(null);
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
 
     const navigate = useNavigate();
 
-    // Password strength validation
-    const validatePasswordStrength = (password) => {
-        const hasUpperCase = /[A-Z]/.test(password);
-        const hasLowerCase = /[a-z]/.test(password);
-        const hasNumber = /\d/.test(password);
-        const hasSpecialChar = /[@$!%*?&#]/.test(password);
-        const isLongEnough = password.length >= 8;
-
-        const criteriasMet = [hasUpperCase, hasLowerCase, hasNumber, hasSpecialChar, isLongEnough].filter(Boolean).length;
-
-        if (criteriasMet === 5) return { strength: 'Strong', color: 'green' };
-        if (criteriasMet >= 3) return { strength: 'Medium', color: 'orange' };
-        return { strength: 'Weak', color: 'red' };
+    const strengthOf = (pw) => {
+        const n = [/[A-Z]/.test(pw), /[a-z]/.test(pw), /\d/.test(pw), /[@$!%*?&#]/.test(pw), pw.length >= 8].filter(Boolean).length;
+        if (n === 5) return { label: 'Strong', color: '#10b981' };
+        if (n >= 3)  return { label: 'Medium', color: '#f59e0b' };
+        return { label: 'Weak', color: '#ef4444' };
     };
+
+    const clearErr = (name) => setErrors(prev => ({ ...prev, [name]: '' }));
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData({
-            ...formData,
-            [name]: value
-        });
-        setError('');
+        setFormData(prev => ({ ...prev, [name]: value }));
+        clearErr(name);
+        if (name === 'password') setPasswordStrength(value ? strengthOf(value) : null);
+        if (name === 'confirmPassword' && errors.confirmPassword) clearErr('confirmPassword');
+    };
 
-        // Update password strength indicator
-        if (name === 'password') {
-            const strength = validatePasswordStrength(value);
-            setPasswordStrength(strength);
-        }
+    const handleAddressChange = (field, value) => {
+        setAddressFields(prev => ({ ...prev, [field]: value }));
+        if (errors[field]) clearErr(field);
+    };
+
+    const validate = () => {
+        const e = {};
+        const fn = formData.fullName.trim();
+        if (!fn)              e.fullName = 'Full name is required.';
+        else if (fn.length < 2)   e.fullName = 'Full name must be at least 2 characters.';
+        else if (fn.length > 200) e.fullName = 'Full name cannot exceed 200 characters.';
+
+        const em = formData.email.trim();
+        if (!em)                                      e.email = 'Email address is required.';
+        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) e.email = 'Please enter a valid email address (e.g. you@example.com).';
+        else if (em.length > 150)                     e.email = 'Email address cannot exceed 150 characters.';
+
+        const pw = formData.password;
+        if (!pw)                         e.password = 'Password is required.';
+        else if (pw.length < 8)          e.password = 'Password must be at least 8 characters long.';
+        else if (!/[A-Z]/.test(pw))      e.password = 'Password must include at least one uppercase letter (A–Z).';
+        else if (!/[a-z]/.test(pw))      e.password = 'Password must include at least one lowercase letter (a–z).';
+        else if (!/\d/.test(pw))         e.password = 'Password must include at least one number (0–9).';
+        else if (!/[@$!%*?&#]/.test(pw)) e.password = 'Password must include at least one special character (@$!%*?&#).';
+
+        if (!formData.confirmPassword)                  e.confirmPassword = 'Please confirm your password.';
+        else if (formData.password !== formData.confirmPassword) e.confirmPassword = 'Passwords do not match.';
+
+        const phone = formData.phoneNumber.replace(/\s/g, '');
+        if (phone && !/^0[0-9]{9}$/.test(phone)) e.phoneNumber = 'Must be 10 digits starting with 0 (e.g. 0712345678).';
+
+        const pc = addressFields.postalCode.trim();
+        if (pc && !/^\d{4}$/.test(pc)) e.postalCode = 'Postal code must be exactly 4 digits.';
+
+        return e;
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
+        const errs = validate();
+        if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+        setErrors({});
 
-        if (formData.password !== formData.confirmPassword) {
-            setError('Passwords do not match');
-            return;
-        }
-
-        // Validate password strength
-        const hasUpperCase = /[A-Z]/.test(formData.password);
-        const hasLowerCase = /[a-z]/.test(formData.password);
-        const hasNumber = /\d/.test(formData.password);
-        const hasSpecialChar = /[@$!%*?&#]/.test(formData.password);
-        const isLongEnough = formData.password.length >= 8;
-
-        if (!isLongEnough || !hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
-            setError('Password must be at least 8 characters and contain uppercase, lowercase, number, and special character (@$!%*?&#)');
-            return;
-        }
+        const address = [addressFields.street, addressFields.city, addressFields.province, addressFields.postalCode]
+            .map(s => s.trim()).filter(Boolean).join(', ');
 
         setLoading(true);
-
         try {
-            const { confirmPassword, ...registrationData } = formData;
-            const response = await authAPI.register(registrationData);
-
-            if (response.data.success) {
-                setSuccess(true);
-                setTimeout(() => navigate('/login'), 2000);
-            } else {
-                setError(response.data.message || 'Registration failed');
-            }
+            const { confirmPassword, ...reg } = formData;
+            const res = await authAPI.register({ ...reg, address });
+            if (res.data.success) { setSuccess(true); setTimeout(() => navigate('/login'), 2000); }
+            else setErrors({ _form: res.data.message || 'Registration failed.' });
         } catch (err) {
-            console.error('Registration error:', err);
-            setError(err.response?.data?.message || 'Registration failed. Please try again.');
-        } finally {
-            setLoading(false);
-        }
+            setErrors({ _form: err.response?.data?.message || 'Registration failed. Please try again.' });
+        } finally { setLoading(false); }
     };
 
-    if (success) {
-        return (
-            <div className="auth-container">
-                <div className="auth-card">
-                    <div className="success-message">
-                        <h2>✅ Registration Successful!</h2>
-                        <p>Redirecting to login...</p>
-                    </div>
-                </div>
+    if (success) return (
+        <div className="auth-blue-page">
+            <img src={logo} alt="" className="auth-bg-logo" aria-hidden="true" />
+            <div className="auth-deco-tl" /><div className="auth-deco-bl" /><div className="auth-deco-tr" /><div className="auth-deco-br" />
+            <div className="auth-glass-card" style={{ textAlign: 'center', padding: '52px 40px' }}>
+                <img src={logo} alt="MHS" style={{ width: '80px', marginBottom: '16px' }} />
+                <h2 className="auth-glass-title" style={{ marginBottom: '8px' }}>Account Created!</h2>
+                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '15px' }}>Redirecting you to the login page…</p>
             </div>
-        );
-    }
+        </div>
+    );
+
+    const F = ({ name, children }) => (
+        <div className={`auth-glass-field${errors[name] ? ' has-error' : ''}`}>{children}</div>
+    );
 
     return (
-        <div className="auth-container">
-            <div className="auth-card">
-                <div className="auth-logo">
-                    <div className="logo-icon">TM</div>
-                    <div className="logo-text">
-                        <h2>Tirisano Mmogo</h2>
-                        <p>Working Together for Excellence</p>
-                    </div>
+        <div className="auth-blue-page">
+            <img src={logo} alt="" className="auth-bg-logo" aria-hidden="true" />
+            <div className="auth-deco-tl" /><div className="auth-deco-bl" /><div className="auth-deco-tr" /><div className="auth-deco-br" />
+
+            <div className="auth-glass-card auth-glass-card-wide">
+                <div className="auth-glass-brand">
+                    <img src={logo} alt="Meridian High School" className="auth-glass-logo" />
+                    <span className="auth-glass-brand-name">Meridian High School</span>
                 </div>
+                <h2 className="auth-glass-title">Create Account</h2>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="form-group">
-                        <label htmlFor="fullName">Full Name *</label>
-                        <input
-                            type="text"
-                            id="fullName"
-                            name="fullName"
-                            value={formData.fullName}
-                            onChange={handleChange}
-                            placeholder="Enter your full name"
-                            required
-                        />
+                <form onSubmit={handleSubmit} noValidate>
+                    {/* Row 1: Name + Email */}
+                    <div className="auth-glass-row">
+                        <F name="fullName">
+                            <label htmlFor="fullName">Full Name <span className="field-required">*</span></label>
+                            <input type="text" id="fullName" name="fullName" value={formData.fullName} onChange={handleChange} placeholder="Your full name" />
+                            {errors.fullName
+                                ? <span className="field-error">{errors.fullName}</span>
+                                : <span className="field-hint">Required · max 200 characters</span>}
+                        </F>
+                        <F name="email">
+                            <label htmlFor="email">Email Address <span className="field-required">*</span></label>
+                            <input type="email" id="email" name="email" value={formData.email} onChange={handleChange} placeholder="you@example.com" autoComplete="email" />
+                            {errors.email
+                                ? <span className="field-error">{errors.email}</span>
+                                : <span className="field-hint">Required · max 150 characters</span>}
+                        </F>
                     </div>
 
-                    <div className="form-group">
-                        <label htmlFor="email">Email Address *</label>
-                        <input
-                            type="email"
-                            id="email"
-                            name="email"
-                            value={formData.email}
-                            onChange={handleChange}
-                            placeholder="Enter your email"
-                            required
-                            autoComplete="email"
-                        />
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="password">Password *</label>
-                        <div style={{ position: 'relative' }}>
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                id="password"
-                                name="password"
-                                value={formData.password}
-                                onChange={handleChange}
-                                placeholder="Min 8 chars, uppercase, lowercase, number, special char"
-                                required
-                                autoComplete="new-password"
-                                minLength="8"
-                                style={{ paddingRight: '40px' }}
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                style={{
-                                    position: 'absolute',
-                                    right: '10px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    background: 'none',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    fontSize: '18px',
-                                    padding: '0',
-                                    color: '#666'
-                                }}
-                                title={showPassword ? "Hide password" : "Show password"}
-                            >
-                                {showPassword ? '👁️' : '👁️‍🗨️'}
-                            </button>
-                        </div>
-                        {formData.password && passwordStrength && (
-                            <div className="password-strength" style={{ marginTop: '5px' }}>
-                                <span style={{ color: passwordStrength.color, fontWeight: 'bold' }}>
-                                    Strength: {passwordStrength.strength}
-                                </span>
+                    {/* Row 2: Password + Confirm */}
+                    <div className="auth-glass-row">
+                        <F name="password">
+                            <label htmlFor="password">Password <span className="field-required">*</span></label>
+                            <div className="auth-glass-pw-wrap">
+                                <input type={showPassword ? 'text' : 'password'} id="password" name="password" value={formData.password} onChange={handleChange} placeholder="Min 8 chars" autoComplete="new-password" />
+                                <button type="button" className="auth-glass-pw-toggle" onClick={() => setShowPassword(v => !v)}>{showPassword ? '👁️' : '👁️‍🗨️'}</button>
                             </div>
-                        )}
-                        <small style={{ display: 'block', marginTop: '5px', color: '#666' }}>
-                            Must contain: uppercase, lowercase, number, special char (@$!%*?&#)
-                        </small>
+                            {errors.password
+                                ? <span className="field-error">{errors.password}</span>
+                                : passwordStrength && formData.password
+                                    ? <span className="auth-glass-strength" style={{ color: passwordStrength.color }}>Strength: {passwordStrength.label}</span>
+                                    : <span className="field-hint">Min 8 chars · A–Z · a–z · 0–9 · @$!%*?&#</span>}
+                        </F>
+                        <F name="confirmPassword">
+                            <label htmlFor="confirmPassword">Confirm Password <span className="field-required">*</span></label>
+                            <div className="auth-glass-pw-wrap">
+                                <input type={showConfirm ? 'text' : 'password'} id="confirmPassword" name="confirmPassword" value={formData.confirmPassword} onChange={handleChange} placeholder="Re-enter password" autoComplete="new-password" />
+                                <button type="button" className="auth-glass-pw-toggle" onClick={() => setShowConfirm(v => !v)}>{showConfirm ? '👁️' : '👁️‍🗨️'}</button>
+                            </div>
+                            {errors.confirmPassword
+                                ? <span className="field-error">{errors.confirmPassword}</span>
+                                : <span className="field-hint">Must match the password above</span>}
+                        </F>
                     </div>
 
-                    <div className="form-group">
-                        <label htmlFor="confirmPassword">Confirm Password *</label>
-                        <div style={{ position: 'relative' }}>
-                            <input
-                                type={showConfirmPassword ? "text" : "password"}
-                                id="confirmPassword"
-                                name="confirmPassword"
-                                value={formData.confirmPassword}
-                                onChange={handleChange}
-                                placeholder="Re-enter your password"
-                                required
-                                autoComplete="new-password"
-                                minLength="8"
-                                style={{ paddingRight: '40px' }}
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                style={{
-                                    position: 'absolute',
-                                    right: '10px',
-                                    top: '50%',
-                                    transform: 'translateY(-50%)',
-                                    background: 'none',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    fontSize: '18px',
-                                    padding: '0',
-                                    color: '#666'
-                                }}
-                                title={showConfirmPassword ? "Hide password" : "Show password"}
-                            >
-                                {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
-                            </button>
+                    {/* Row 3: Phone + Postal Code */}
+                    <div className="auth-glass-row">
+                        <F name="phoneNumber">
+                            <label htmlFor="phoneNumber">Phone Number</label>
+                            <input type="tel" id="phoneNumber" name="phoneNumber" value={formData.phoneNumber} onChange={handleChange} placeholder="e.g. 0712345678" />
+                            {errors.phoneNumber
+                                ? <span className="field-error">{errors.phoneNumber}</span>
+                                : <span className="field-hint">Optional · 10 digits starting with 0</span>}
+                        </F>
+                        <F name="postalCode">
+                            <label htmlFor="postalCode">Postal Code</label>
+                            <input type="text" id="postalCode" value={addressFields.postalCode} onChange={e => handleAddressChange('postalCode', e.target.value)} placeholder="e.g. 0181" maxLength={4} />
+                            {errors.postalCode
+                                ? <span className="field-error">{errors.postalCode}</span>
+                                : <span className="field-hint">Optional · 4-digit SA postal code</span>}
+                        </F>
+                    </div>
+
+                    {/* Street Address */}
+                    <div className="auth-glass-field" style={{ marginBottom: '14px' }}>
+                        <label htmlFor="street">Street Address</label>
+                        <input type="text" id="street" value={addressFields.street} onChange={e => handleAddressChange('street', e.target.value)} placeholder="e.g. 8032 Seychelles Avenue" />
+                        <span className="field-hint">Optional · house number and street name</span>
+                    </div>
+
+                    {/* Row 4: City + Province */}
+                    <div className="auth-glass-row">
+                        <div className="auth-glass-field">
+                            <label htmlFor="city">City / Town</label>
+                            <input type="text" id="city" value={addressFields.city} onChange={e => handleAddressChange('city', e.target.value)} placeholder="e.g. Pretoria" />
+                            <span className="field-hint">Optional</span>
+                        </div>
+                        <div className="auth-glass-field">
+                            <label htmlFor="province">Province</label>
+                            <select id="province" value={addressFields.province} onChange={e => handleAddressChange('province', e.target.value)}>
+                                <option value="">Select province…</option>
+                                <option>Gauteng</option>
+                                <option>Western Cape</option>
+                                <option>KwaZulu-Natal</option>
+                                <option>Eastern Cape</option>
+                                <option>Limpopo</option>
+                                <option>Mpumalanga</option>
+                                <option>North West</option>
+                                <option>Free State</option>
+                                <option>Northern Cape</option>
+                            </select>
+                            <span className="field-hint">Optional</span>
                         </div>
                     </div>
 
-                    <div className="form-group">
-                        <label htmlFor="phoneNumber">Phone Number</label>
-                        <input
-                            type="tel"
-                            id="phoneNumber"
-                            name="phoneNumber"
-                            value={formData.phoneNumber}
-                            onChange={handleChange}
-                            placeholder="Enter your phone number"
-                        />
-                    </div>
+                    {errors._form && <div className="form-error-msg">{errors._form}</div>}
 
-                    <div className="form-group">
-                        <label htmlFor="address">Address</label>
-                        <textarea
-                            id="address"
-                            name="address"
-                            value={formData.address}
-                            onChange={handleChange}
-                            placeholder="Enter your address"
-                            rows="3"
-                        />
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="role">Register As *</label>
-                        <select
-                            id="role"
-                            name="role"
-                            value={formData.role}
-                            onChange={handleChange}
-                            required
-                        >
-                            <option value="PARENT">Parent</option>
-                            <option value="ADMIN">Administrator</option>
-                        </select>
-                    </div>
-
-                    {error && <div className="error-message">{error}</div>}
-
-                    <button type="submit" disabled={loading} className="btn-primary" style={{ width: '100%' }}>
-                        {loading ? 'Creating Account...' : 'Register'}
+                    <button type="submit" disabled={loading} className="auth-glass-submit">
+                        {loading ? 'Creating Account…' : 'Create Account'}
                     </button>
                 </form>
 
-                <p className="auth-link">
-                    Already have an account? <Link to="/login">Login here</Link>
+                <p className="auth-glass-register">
+                    Already have an account? <Link to="/login">Sign in here</Link>
                 </p>
             </div>
         </div>

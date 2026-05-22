@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { studentAPI, documentAPI, parentAPI } from '../../services/api';
 import DocumentViewer from '../common/DocumentViewer';
+import { showToast } from '../../utils/toast';
+import { showConfirm } from '../../utils/confirm';
 
 const StudentManagement = () => {
     const [students, setStudents] = useState([]);
@@ -16,44 +18,33 @@ const StudentManagement = () => {
     const [showApprovalForm, setShowApprovalForm] = useState(false);
     const [selectedDocument, setSelectedDocument] = useState(null);
     const [parentNames, setParentNames] = useState({});
-    const [approvalData, setApprovalData] = useState({
-        className: '',
-        teacher: ''
-    });
+    const [approvalData, setApprovalData] = useState({ className: '', teacher: '' });
+    const [showRejectModal, setShowRejectModal] = useState(false);
+    const [rejectingStudentId, setRejectingStudentId] = useState(null);
+    const [rejectionReason, setRejectionReason] = useState('');
+    const [rejectError, setRejectError] = useState('');
+    const [approvalErrors, setApprovalErrors] = useState({});
 
-    useEffect(() => {
-        loadStudents();
-    }, [activeTab]);
+    useEffect(() => { loadStudents(); }, [activeTab]);
 
-    const sortStudentsByGrade = (studentsList) => {
-        const gradeOrder = ['R', '1', '2', '3', '4', '5', '6', '7'];
-        return [...studentsList].sort((a, b) => {
-            const gradeA = (a.grade || '').replace('Grade ', '').trim();
-            const gradeB = (b.grade || '').replace('Grade ', '').trim();
-            const indexA = gradeOrder.indexOf(gradeA);
-            const indexB = gradeOrder.indexOf(gradeB);
-            return indexA - indexB;
+    const sortStudentsByGrade = (list) => {
+        const order = ['R', '1', '2', '3', '4', '5', '6', '7'];
+        return [...list].sort((a, b) => {
+            const ga = (a.grade || '').replace('Grade ', '').trim();
+            const gb = (b.grade || '').replace('Grade ', '').trim();
+            return order.indexOf(ga) - order.indexOf(gb);
         });
     };
 
-    const loadParentNames = async (studentsList) => {
-        const uniqueParentIds = [...new Set(studentsList.map(s => s.parentId).filter(Boolean))];
+    const loadParentNames = async (list) => {
+        const ids = [...new Set(list.map(s => s.parentId).filter(Boolean))];
         const names = {};
-
-        await Promise.all(
-            uniqueParentIds.map(async (parentId) => {
-                try {
-                    const response = await parentAPI.getParent(parentId);
-                    if (response.data.success) {
-                        names[parentId] = response.data.data.fullName;
-                    }
-                } catch (err) {
-                    console.error(`Failed to load parent ${parentId}:`, err);
-                    names[parentId] = 'Unknown';
-                }
-            })
-        );
-
+        await Promise.all(ids.map(async id => {
+            try {
+                const res = await parentAPI.getParent(id);
+                if (res.data.success) names[id] = res.data.data.fullName;
+            } catch { names[id] = 'Unknown'; }
+        }));
         setParentNames(prev => ({ ...prev, ...names }));
     };
 
@@ -62,39 +53,32 @@ const StudentManagement = () => {
         setError(null);
         try {
             let response;
-            let studentsList = [];
-
+            let list = [];
             switch (activeTab) {
                 case 'all':
                     response = await studentAPI.getAllStudents();
-                    studentsList = response.data.data || [];
-                    setStudents(sortStudentsByGrade(studentsList));
+                    list = response.data.data || [];
+                    setStudents(sortStudentsByGrade(list));
                     break;
                 case 'pending':
                     response = await studentAPI.getPendingStudents();
-                    studentsList = response.data.data || [];
-                    setPendingStudents(sortStudentsByGrade(studentsList));
+                    list = response.data.data || [];
+                    setPendingStudents(sortStudentsByGrade(list));
                     break;
                 case 'approved':
                     response = await studentAPI.getApprovedStudents();
-                    studentsList = response.data.data || [];
-                    setApprovedStudents(sortStudentsByGrade(studentsList));
+                    list = response.data.data || [];
+                    setApprovedStudents(sortStudentsByGrade(list));
                     break;
                 case 'rejected':
                     response = await studentAPI.getRejectedStudents();
-                    studentsList = response.data.data || [];
-                    setRejectedStudents(sortStudentsByGrade(studentsList));
+                    list = response.data.data || [];
+                    setRejectedStudents(sortStudentsByGrade(list));
                     break;
-                default:
-                    break;
+                default: break;
             }
-
-            // Load parent names for all students
-            if (studentsList.length > 0) {
-                await loadParentNames(studentsList);
-            }
-        } catch (error) {
-            console.error('Error loading students:', error);
+            if (list.length > 0) await loadParentNames(list);
+        } catch {
             setError('Failed to load students. Please try again.');
         } finally {
             setLoading(false);
@@ -104,123 +88,86 @@ const StudentManagement = () => {
     const handleViewDocuments = async (student) => {
         setSelectedStudent(student);
         try {
-            const response = await documentAPI.getDocumentsByStudentId(student.studentId);
-            if (response.data.success) {
-                setStudentDocuments(response.data.data || []);
-            } else {
-                setStudentDocuments([]);
-            }
-        } catch (error) {
-            console.error('Error loading documents:', error);
-            setStudentDocuments([]);
-        }
+            const res = await documentAPI.getDocumentsByStudentId(student.studentId);
+            setStudentDocuments(res.data.success ? res.data.data || [] : []);
+        } catch { setStudentDocuments([]); }
         setShowDocuments(true);
     };
 
     const handleApproveClick = (student) => {
         setSelectedStudent(student);
-        setApprovalData({
-            className: '',
-            teacher: ''
-        });
+        setApprovalData({ className: '', teacher: '' });
         setShowApprovalForm(true);
     };
 
     const handleApprove = async (studentId) => {
-        if (!studentId) {
-            alert('Error: Student ID is missing!');
-            console.error('Student ID is null or undefined');
-            return;
-        }
-
-        if (!window.confirm('Are you sure you want to approve this student?')) return;
-
+        if (!studentId) return;
+        const ok = await showConfirm('Approve this student?', 'The student will be marked as approved.');
+        if (!ok) return;
         try {
-            const response = await studentAPI.approveStudent(studentId);
-            if (response.data.success) {
-                alert('Student approved successfully!');
-                loadStudents();
-            }
-        } catch (error) {
-            console.error('Error approving student:', error);
-            alert('Failed to approve student. Please try again.');
-        }
+            const res = await studentAPI.approveStudent(studentId);
+            if (res.data.success) { showToast('Student approved!', 'success'); loadStudents(); }
+        } catch { showToast('Failed to approve student.', 'error'); }
     };
 
     const handleApproveWithClass = async (e) => {
         e.preventDefault();
         if (!selectedStudent) return;
-
+        const ae = {};
+        if (!approvalData.className.trim() || approvalData.className.trim().length < 2) ae.className = 'Class name must be at least 2 characters.';
+        if (!approvalData.teacher.trim() || approvalData.teacher.trim().length < 2) ae.teacher = 'Teacher name must be at least 2 characters.';
+        if (Object.keys(ae).length > 0) { setApprovalErrors(ae); return; }
+        setApprovalErrors({});
         try {
-            const response = await studentAPI.approveStudentWithClass(
-                selectedStudent.studentId,
-                approvalData
-            );
-            if (response.data.success) {
-                alert('Student approved and assigned to class successfully!');
+            const res = await studentAPI.approveStudentWithClass(selectedStudent.studentId, approvalData);
+            if (res.data.success) {
+                showToast('Student approved and assigned to class!', 'success');
                 setShowApprovalForm(false);
                 setSelectedStudent(null);
                 setApprovalData({ className: '', teacher: '' });
                 loadStudents();
             }
-        } catch (error) {
-            console.error('Error approving student:', error);
-            alert('Failed to approve student. Please try again.');
-        }
+        } catch { showToast('Failed to approve student.', 'error'); }
     };
 
-    const handleReject = async (studentId) => {
-        if (!studentId) {
-            alert('Error: Student ID is missing!');
-            console.error('Student ID is null or undefined');
-            return;
-        }
+    const handleReject = (studentId) => {
+        if (!studentId) return;
+        setRejectingStudentId(studentId);
+        setRejectionReason('');
+        setShowRejectModal(true);
+    };
 
-        const reason = prompt('Please enter rejection reason:');
-        if (!reason || reason.trim() === '') {
-            alert('Rejection reason is required.');
-            return;
-        }
-
+    const handleRejectSubmit = async () => {
+        if (!rejectionReason.trim()) { setRejectError('Rejection reason is required.'); return; }
+        if (rejectionReason.trim().length < 10) { setRejectError('Please provide at least 10 characters.'); return; }
+        setRejectError('');
         try {
-            const response = await studentAPI.rejectStudent(studentId, reason);
-            if (response.data.success) {
-                alert('Student rejected successfully!');
+            const res = await studentAPI.rejectStudent(rejectingStudentId, rejectionReason);
+            if (res.data.success) {
+                showToast('Student rejected.', 'success');
+                setShowRejectModal(false);
+                setRejectingStudentId(null);
+                setRejectionReason('');
                 loadStudents();
             }
-        } catch (error) {
-            console.error('Error rejecting student:', error);
-            alert('Failed to reject student. Please try again.');
-        }
+        } catch { showToast('Failed to reject student.', 'error'); }
     };
 
     const handleDelete = async (studentId) => {
-        if (!studentId) {
-            alert('Error: Student ID is missing!');
-            return;
-        }
-
-        if (!window.confirm('Are you sure you want to delete this student? This action cannot be undone.')) return;
-
+        if (!studentId) return;
+        const ok = await showConfirm('Delete this student?', 'This action cannot be undone.');
+        if (!ok) return;
         try {
-            const response = await studentAPI.deleteStudent(studentId);
-            if (response.data.success) {
-                alert('Student deleted successfully!');
-                loadStudents();
-            }
-        } catch (error) {
-            console.error('Error deleting student:', error);
-            alert('Failed to delete student. Please try again.');
-        }
+            const res = await studentAPI.deleteStudent(studentId);
+            if (res.data.success) { showToast('Student deleted.', 'success'); loadStudents(); }
+        } catch { showToast('Failed to delete student.', 'error'); }
     };
 
-    const getStatusColor = (status) => {
-        switch (status) {
-            case 'APPROVED': return '#10b981';
-            case 'PENDING': return '#f59e0b';
-            case 'REJECTED': return '#ef4444';
-            default: return '#6b7280';
-        }
+    const statusBadge = (status) => {
+        if (status === 'APPROVED') return 'success';
+        if (status === 'PENDING')  return 'warning';
+        if (status === 'REJECTED') return 'danger';
+        return 'muted';
     };
 
     const getCurrentStudents = () => {
@@ -233,307 +180,173 @@ const StudentManagement = () => {
         }
     };
 
-    if (loading) return <div className="loading">Loading students...</div>;
-    if (error) return <div className="error-message">{error}</div>;
-
-    const currentStudents = getCurrentStudents();
+    const current = getCurrentStudents();
 
     return (
-        <div className="student-management">
-            <DocumentViewer
-                document={selectedDocument}
-                onClose={() => setSelectedDocument(null)}
-            />
+        <div className="page-wrapper">
+            <DocumentViewer document={selectedDocument} onClose={() => setSelectedDocument(null)} />
 
-            <div className="management-header">
-                <h2>Student Management</h2>
-                <div className="stats">
-                    <span>Total: {students.length}</span>
-                    <span>Pending: {pendingStudents.length}</span>
-                    <span>Approved: {approvedStudents.length}</span>
-                    <span>Rejected: {rejectedStudents.length}</span>
+            <div className="page-header">
+                <div>
+                    <h1 className="page-title">Student Management</h1>
+                    <p className="page-subtitle">Review applications and manage enrolled students</p>
                 </div>
             </div>
 
-            {/* Tabs */}
-            <div className="tabs">
-                <button
-                    className={`tab ${activeTab === 'all' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('all')}
-                >
-                    All Students
-                </button>
-                <button
-                    className={`tab ${activeTab === 'pending' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('pending')}
-                >
-                    Pending ({pendingStudents.length})
-                </button>
-                <button
-                    className={`tab ${activeTab === 'approved' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('approved')}
-                >
-                    Approved ({approvedStudents.length})
-                </button>
-                <button
-                    className={`tab ${activeTab === 'rejected' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('rejected')}
-                >
-                    Rejected ({rejectedStudents.length})
-                </button>
+            <div className="page-stats-row">
+                <span className="stat-pill">All: {students.length}</span>
+                <span className="stat-pill warning">Pending: {pendingStudents.length}</span>
+                <span className="stat-pill success">Approved: {approvedStudents.length}</span>
+                <span className="stat-pill danger">Rejected: {rejectedStudents.length}</span>
             </div>
 
-            {/* Students List */}
-            {currentStudents.length > 0 ? (
-                <div className="students-grid">
-                    {currentStudents.map((student) => (
-                        <div key={student.studentId} className="student-card">
-                            <div className="card-header">
-                                <h3>{student.fullName}</h3>
-                                <span
-                                    className="status-badge"
-                                    style={{
-                                        backgroundColor: getStatusColor(student.status),
-                                        color: 'white',
-                                        padding: '4px 12px',
-                                        borderRadius: '12px',
-                                        fontSize: '12px',
-                                        fontWeight: 'bold'
-                                    }}
-                                >
-                                    {student.status}
-                                </span>
-                            </div>
+            <div className="filter-tabs-bar">
+                {[
+                    { key: 'pending',  label: 'Pending',  count: pendingStudents.length },
+                    { key: 'approved', label: 'Approved', count: approvedStudents.length },
+                    { key: 'rejected', label: 'Rejected', count: rejectedStudents.length },
+                    { key: 'all',      label: 'All',      count: null },
+                ].map(t => (
+                    <button key={t.key} className={`ftab${activeTab === t.key ? ' active' : ''}`} onClick={() => setActiveTab(t.key)}>
+                        {t.label}
+                        {t.count !== null && <span className="ftab-count">{t.count}</span>}
+                    </button>
+                ))}
+            </div>
 
-                            <div className="student-details">
-                                {student.birthCertificateId && (
-                                    <p><strong>Birth Certificate ID:</strong> {student.birthCertificateId}</p>
-                                )}
-                                <p><strong>Grade:</strong> Grade {(student.grade || '').replace('Grade ', '')}</p>
-                                {student.className && <p><strong>Class:</strong> {student.className}</p>}
-                                {student.teacher && <p><strong>Teacher:</strong> {student.teacher}</p>}
-                                {student.dateOfBirth && (
-                                    <p><strong>Date of Birth:</strong> {
-                                        typeof student.dateOfBirth === 'string'
-                                            ? student.dateOfBirth
-                                            : new Date(student.dateOfBirth).toLocaleDateString()
-                                    }</p>
-                                )}
-                                <p><strong>Parent:</strong> {parentNames[student.parentId] || 'Loading...'}</p>
-                                {student.createdAt && (
-                                    <p><strong>Applied:</strong> {
-                                        typeof student.createdAt === 'string'
-                                            ? new Date(student.createdAt).toLocaleDateString()
-                                            : new Date(student.createdAt).toLocaleDateString()
-                                    }</p>
-                                )}
-                                {student.rejectionReason && (
-                                    <div className="rejection-reason" style={{
-                                        marginTop: '12px',
-                                        padding: '12px',
-                                        backgroundColor: '#fef2f2',
-                                        borderRadius: '8px',
-                                        borderLeft: '3px solid #ef4444'
-                                    }}>
-                                        <p><strong>Rejection Reason:</strong></p>
-                                        <p className="reason-text" style={{ color: '#991b1b', marginTop: '4px' }}>
-                                            {student.rejectionReason}
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="student-actions" style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '8px',
-                                marginTop: '15px',
-                                paddingTop: '15px',
-                                borderTop: '1px solid #e0e0e0'
-                            }}>
-                                <button
-                                    onClick={() => handleViewDocuments(student)}
-                                    className="btn-info"
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px 16px',
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        backgroundColor: '#9C27B0',
-                                        color: 'white',
-                                        fontSize: '14px',
-                                        fontWeight: '500',
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    📋 View & Manage Documents
-                                </button>
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                    {student.status === 'PENDING' && (
-                                        <>
-                                            <button
-                                                onClick={() => handleApproveClick(student)}
-                                                className="btn-success"
-                                                style={{
-                                                    flex: 1,
-                                                    padding: '10px 16px',
-                                                    border: 'none',
-                                                    borderRadius: '6px',
-                                                    backgroundColor: '#4CAF50',
-                                                    color: 'white',
-                                                    fontSize: '14px',
-                                                    fontWeight: '500',
-                                                    cursor: 'pointer'
-                                                }}
-                                            >
-                                                ✓ Approve
-                                            </button>
-                                            <button
-                                                onClick={() => handleReject(student.studentId)}
-                                                className="btn-danger"
-                                                style={{
-                                                    flex: 1,
-                                                    padding: '10px 16px',
-                                                    border: 'none',
-                                                    borderRadius: '6px',
-                                                    backgroundColor: '#dc3545',
-                                                    color: 'white',
-                                                    fontSize: '14px',
-                                                    fontWeight: '500',
-                                                    cursor: 'pointer'
-                                                }}
-                                            >
-                                                ✗ Reject
-                                            </button>
-                                        </>
-                                    )}
-                                    {student.status === 'REJECTED' && (
-                                        <button
-                                            onClick={() => handleApprove(student.studentId)}
-                                            className="btn-success"
-                                            style={{
-                                                flex: 1,
-                                                padding: '10px 16px',
-                                                border: 'none',
-                                                borderRadius: '6px',
-                                                backgroundColor: '#4CAF50',
-                                                color: 'white',
-                                                fontSize: '14px',
-                                                fontWeight: '500',
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            ✓ Approve
-                                        </button>
-                                    )}
-                                    {student.status === 'APPROVED' && (
-                                        <button
-                                            onClick={() => handleReject(student.studentId)}
-                                            className="btn-warning"
-                                            style={{
-                                                flex: 1,
-                                                padding: '10px 16px',
-                                                border: 'none',
-                                                borderRadius: '6px',
-                                                backgroundColor: '#f59e0b',
-                                                color: 'white',
-                                                fontSize: '14px',
-                                                fontWeight: '500',
-                                                cursor: 'pointer'
-                                            }}
-                                        >
-                                            ✗ Revoke
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => handleDelete(student.studentId)}
-                                        className="btn-delete"
-                                        style={{
-                                            flex: 1,
-                                            padding: '10px 16px',
-                                            border: 'none',
-                                            borderRadius: '6px',
-                                            backgroundColor: '#dc3545',
-                                            color: 'white',
-                                            fontSize: '14px',
-                                            fontWeight: '500',
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        🗑️ Delete
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
+            {loading ? (
+                <div className="loading">Loading students…</div>
+            ) : error ? (
+                <div className="error-message">{error}</div>
             ) : (
-                <div className="empty-state">
-                    <p>No {activeTab !== 'all' ? activeTab : ''} students found.</p>
+                <div className="data-table-container">
+                    {current.length > 0 ? (
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Grade</th>
+                                    <th>Class / Teacher</th>
+                                    <th>Parent</th>
+                                    <th>Status</th>
+                                    <th>Applied</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {current.map(s => (
+                                    <tr key={s.studentId}>
+                                        <td>
+                                            <div className="cell-with-avatar">
+                                                <div className="row-avatar">
+                                                    {(s.name?.[0] || '?')}{(s.surname?.[0] || '')}
+                                                </div>
+                                                <div>
+                                                    <div className="cell-primary">{s.name} {s.surname}</div>
+                                                    {s.rejectionReason && (
+                                                        <div className="cell-secondary" style={{ color: '#ef4444' }} title={s.rejectionReason}>
+                                                            ✗ {s.rejectionReason.slice(0, 40)}{s.rejectionReason.length > 40 ? '…' : ''}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>Grade {(s.grade || '').replace('Grade ', '')}</td>
+                                        <td>
+                                            {s.className
+                                                ? <><div className="cell-primary">{s.className}</div><div className="cell-secondary">{s.teacher}</div></>
+                                                : <span style={{ color: '#adb5c0' }}>—</span>}
+                                        </td>
+                                        <td>{parentNames[s.parentId] || <span style={{ color: '#adb5c0' }}>Loading…</span>}</td>
+                                        <td><span className={`badge badge-${statusBadge(s.status)}`}>{s.status}</span></td>
+                                        <td style={{ whiteSpace: 'nowrap' }}>
+                                            {s.createdAt ? new Date(s.createdAt).toLocaleDateString('en-ZA') : '—'}
+                                        </td>
+                                        <td>
+                                            <div className="table-actions">
+                                                <button className="tbtn tbtn-blue" onClick={() => handleViewDocuments(s)}>📋 Docs</button>
+                                                {s.status === 'PENDING' && <>
+                                                    <button className="tbtn tbtn-green" onClick={() => handleApproveClick(s)}>✓ Approve</button>
+                                                    <button className="tbtn tbtn-red"   onClick={() => handleReject(s.studentId)}>✗ Reject</button>
+                                                </>}
+                                                {s.status === 'REJECTED' && (
+                                                    <button className="tbtn tbtn-green" onClick={() => handleApprove(s.studentId)}>✓ Approve</button>
+                                                )}
+                                                {s.status === 'APPROVED' && (
+                                                    <button className="tbtn tbtn-orange" onClick={() => handleReject(s.studentId)}>Revoke</button>
+                                                )}
+                                                <button className="tbtn tbtn-red" onClick={() => handleDelete(s.studentId)}>🗑</button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <div className="empty-table-state">
+                            <div className="empty-icon">🎓</div>
+                            <p>No {activeTab !== 'all' ? activeTab : ''} students found.</p>
+                        </div>
+                    )}
                 </div>
             )}
 
             {/* Documents Modal */}
             {showDocuments && (
                 <div className="modal-overlay" onClick={() => setShowDocuments(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px' }}>
-                        <h3>Documents for {selectedStudent?.fullName}</h3>
+                    <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '720px' }}>
+                        <h3>Documents — {selectedStudent?.name} {selectedStudent?.surname}</h3>
                         {studentDocuments.length > 0 ? (
-                            <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-                                {studentDocuments.map((doc) => (
+                            <div style={{ maxHeight: '460px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                {studentDocuments.map(doc => (
                                     <div key={doc.documentId} style={{
-                                        padding: '15px',
-                                        margin: '10px 0',
-                                        border: '1px solid #e5e7eb',
-                                        borderRadius: '8px',
-                                        backgroundColor: '#f9fafb'
+                                        padding: '14px 16px', border: '1px solid var(--border)', borderRadius: '10px', background: '#f8fafc'
                                     }}>
-                                        <h4 style={{ marginTop: 0 }}>{doc.fileName}</h4>
-                                        <p><strong>Type:</strong> {doc.documentType}</p>
-                                        <p><strong>Uploaded:</strong> {new Date(doc.uploadedAt).toLocaleDateString()}</p>
-                                        {doc.description && <p><strong>Description:</strong> {doc.description}</p>}
-                                        <p>
-                                            <strong>Status:</strong>{' '}
-                                            <span style={{
-                                                color: doc.verified ? '#10b981' : '#f59e0b',
-                                                fontWeight: 'bold'
-                                            }}>
-                                                {doc.verified ? '✓ Verified' : '⏳ Pending Verification'}
+                                        <div style={{ fontWeight: 600, marginBottom: '4px' }}>{doc.fileName}</div>
+                                        <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                                            {doc.documentType} · {new Date(doc.uploadedAt).toLocaleDateString()}
+                                            &nbsp;·&nbsp;
+                                            <span style={{ color: doc.verified ? '#065f46' : '#92400e', fontWeight: 600 }}>
+                                                {doc.verified ? '✓ Verified' : '⏳ Pending'}
                                             </span>
-                                        </p>
+                                        </div>
                                         {doc.fileUrl && (
-                                            <button
-                                                onClick={() => setSelectedDocument(doc)}
-                                                style={{
-                                                    display: 'inline-block',
-                                                    marginTop: '10px',
-                                                    padding: '8px 16px',
-                                                    backgroundColor: '#3b82f6',
-                                                    color: 'white',
-                                                    textDecoration: 'none',
-                                                    borderRadius: '5px',
-                                                    border: 'none',
-                                                    cursor: 'pointer'
-                                                }}
-                                            >
-                                                📥 View Document
-                                            </button>
+                                            <button className="tbtn tbtn-blue" onClick={() => setSelectedDocument(doc)}>👁 View Document</button>
                                         )}
                                     </div>
                                 ))}
                             </div>
                         ) : (
-                            <p style={{ textAlign: 'center', padding: '20px', color: '#6b7280' }}>
-                                No documents uploaded for this student yet.
-                            </p>
+                            <p style={{ padding: '28px 0', textAlign: 'center', color: 'var(--text-muted)' }}>No documents uploaded yet.</p>
                         )}
-                        <button
-                            onClick={() => setShowDocuments(false)}
-                            className="btn-secondary"
-                            style={{ marginTop: '20px', width: '100%' }}
-                        >
-                            Close
-                        </button>
+                        <div className="form-actions">
+                            <button className="btn-secondary" onClick={() => setShowDocuments(false)}>Close</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Reject Modal */}
+            {showRejectModal && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h3>Reject Student Application</h3>
+                        <div className={`form-group${rejectError ? ' has-error' : ''}`} style={{ marginTop: '8px' }}>
+                            <label>Rejection Reason <span className="field-required">*</span></label>
+                            <textarea
+                                value={rejectionReason}
+                                onChange={e => { setRejectionReason(e.target.value); if (rejectError) setRejectError(''); }}
+                                rows="4"
+                                placeholder="Please provide a clear reason for rejection…"
+                            />
+                            {rejectError
+                                ? <span className="field-error">{rejectError}</span>
+                                : <span className="field-hint">Required · minimum 10 characters · shown to the parent</span>}
+                        </div>
+                        <div className="form-actions">
+                            <button className="btn-danger" onClick={handleRejectSubmit}>✗ Reject Student</button>
+                            <button className="btn-secondary" onClick={() => { setShowRejectModal(false); setRejectingStudentId(null); setRejectionReason(''); setRejectError(''); }}>Cancel</button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -542,52 +355,32 @@ const StudentManagement = () => {
             {showApprovalForm && selectedStudent && (
                 <div className="modal-overlay">
                     <div className="modal-content">
-                        <h3>Approve & Assign Class</h3>
-                        <p style={{ marginBottom: '20px', color: '#6b7280' }}>
-                            Approving: <strong>{selectedStudent.fullName}</strong>
+                        <h3>Approve &amp; Assign Class</h3>
+                        <p style={{ marginBottom: '20px', color: 'var(--text-muted)', fontSize: '14px' }}>
+                            Approving: <strong style={{ color: 'var(--text-heading)' }}>{selectedStudent.name} {selectedStudent.surname}</strong>
                         </p>
-                        <form onSubmit={handleApproveWithClass}>
-                            <div className="form-group">
-                                <label>Class Name:</label>
-                                <input
-                                    type="text"
-                                    value={approvalData.className}
-                                    onChange={(e) => setApprovalData({
-                                        ...approvalData,
-                                        className: e.target.value
-                                    })}
-                                    placeholder="e.g., 1A, 2B"
-                                    required
-                                />
+                        <form onSubmit={handleApproveWithClass} noValidate>
+                            <div className={`form-group${approvalErrors.className ? ' has-error' : ''}`}>
+                                <label>Class Name <span className="field-required">*</span></label>
+                                <input type="text" value={approvalData.className}
+                                    onChange={e => { setApprovalData({ ...approvalData, className: e.target.value }); if (approvalErrors.className) setApprovalErrors(p => ({ ...p, className: '' })); }}
+                                    placeholder="e.g. 1A, 2B" />
+                                {approvalErrors.className
+                                    ? <span className="field-error">{approvalErrors.className}</span>
+                                    : <span className="field-hint">Required · e.g. 4A, 6B</span>}
                             </div>
-                            <div className="form-group">
-                                <label>Teacher Name:</label>
-                                <input
-                                    type="text"
-                                    value={approvalData.teacher}
-                                    onChange={(e) => setApprovalData({
-                                        ...approvalData,
-                                        teacher: e.target.value
-                                    })}
-                                    placeholder="e.g., Mrs. Smith"
-                                    required
-                                />
+                            <div className={`form-group${approvalErrors.teacher ? ' has-error' : ''}`}>
+                                <label>Teacher Name <span className="field-required">*</span></label>
+                                <input type="text" value={approvalData.teacher}
+                                    onChange={e => { setApprovalData({ ...approvalData, teacher: e.target.value }); if (approvalErrors.teacher) setApprovalErrors(p => ({ ...p, teacher: '' })); }}
+                                    placeholder="e.g. Mrs. Smith" />
+                                {approvalErrors.teacher
+                                    ? <span className="field-error">{approvalErrors.teacher}</span>
+                                    : <span className="field-hint">Required · assigned class teacher's name</span>}
                             </div>
                             <div className="form-actions">
-                                <button type="submit" className="btn-success">
-                                    ✓ Approve & Assign
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setShowApprovalForm(false);
-                                        setSelectedStudent(null);
-                                        setApprovalData({ className: '', teacher: '' });
-                                    }}
-                                    className="btn-secondary"
-                                >
-                                    Cancel
-                                </button>
+                                <button type="submit" className="btn-success">✓ Approve &amp; Assign</button>
+                                <button type="button" className="btn-secondary" onClick={() => { setShowApprovalForm(false); setSelectedStudent(null); setApprovalData({ className: '', teacher: '' }); setApprovalErrors({}); }}>Cancel</button>
                             </div>
                         </form>
                     </div>

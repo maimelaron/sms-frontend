@@ -4,6 +4,8 @@ import DocumentViewer from '../common/DocumentViewer';
 import SuccessModal from '../common/SuccessModal';
 import DocumentUpload from './DocumentUpload';
 import './DocumentList.css';
+import { showToast } from '../../utils/toast';
+import { showConfirm } from '../../utils/confirm';
 
 const DocumentList = ({ parentId }) => {
     const [documents, setDocuments] = useState([]);
@@ -69,18 +71,17 @@ const DocumentList = ({ parentId }) => {
     };
 
     const handleDeleteDocument = async (documentId) => {
-        if (!window.confirm('Are you sure you want to delete this document?')) return;
-
+        const ok = await showConfirm('Delete this document?', 'This action cannot be undone.');
+        if (!ok) return;
         try {
             const response = await documentAPI.deleteDocument(documentId);
             if (response.data.success) {
                 await loadDocuments();
-                setSuccessMessage('Document deleted successfully!');
-                setShowSuccessModal(true);
+                showToast('Document deleted successfully!', 'success');
             }
         } catch (err) {
             console.error('Error deleting document:', err);
-            alert('Failed to delete document. Please try again.');
+            showToast('Failed to delete document. Please try again.', 'error');
         }
     };
 

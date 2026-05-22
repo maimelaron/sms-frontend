@@ -1,7 +1,7 @@
 // src/services/api.js
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8081/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api';
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -188,6 +188,21 @@ export const paymentAPI = {
 
     // Update operations
     updatePaymentStatus: (paymentId, status) => api.put(`/payments/${paymentId}/status`, { status }),
+};
+
+// Super Admin APIs
+export const superAdminAPI = {
+    getUsers: (role) => api.get('/super-admin/users', { params: role ? { role } : {} }),
+    createUser: (userData) => api.post('/super-admin/users', userData),
+    updateUser: (userId, userData) => api.put(`/super-admin/users/${userId}`, userData),
+    deactivateUser: (userId) => api.put(`/super-admin/users/${userId}/deactivate`),
+    deleteUser: (userId) => api.delete(`/super-admin/users/${userId}`),
+    getStudents: (status) => api.get('/super-admin/students', { params: status ? { status } : {} }),
+};
+
+// Public Stats API (used on login/register pages)
+export const statsAPI = {
+    getPublicStats: () => api.get('/stats'),
 };
 
 export default api;

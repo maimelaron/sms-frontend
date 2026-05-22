@@ -25,9 +25,11 @@ const StudentUpdateForm = ({ student, parentId, onUpdateSuccess, onCancel }) => 
                 name: student.name || '',
                 surname: student.surname || '',
                 gender: student.gender || 'MALE',
-                dateOfBirth: student.dateOfBirth?.seconds
-                    ? new Date(student.dateOfBirth.seconds * 1000).toISOString().split('T')[0]
-                    : '',
+                dateOfBirth: typeof student.dateOfBirth === 'string'
+                    ? student.dateOfBirth
+                    : student.dateOfBirth?.seconds
+                        ? new Date(student.dateOfBirth.seconds * 1000).toISOString().split('T')[0]
+                        : '',
                 birthCertificateId: student.birthCertificateId || '',
                 nationality: student.nationality || '',
                 grade: student.grade || '',
@@ -61,15 +63,8 @@ const StudentUpdateForm = ({ student, parentId, onUpdateSuccess, onCancel }) => 
         }
 
         try {
-            // Convert date to Firebase Timestamp format
-            const dateOfBirth = formData.dateOfBirth ? {
-                seconds: Math.floor(new Date(formData.dateOfBirth).getTime() / 1000),
-                nanos: 0
-            } : null;
-
             const updateData = {
                 ...formData,
-                dateOfBirth,
                 yearOfAdmission: parseInt(formData.yearOfAdmission)
             };
 

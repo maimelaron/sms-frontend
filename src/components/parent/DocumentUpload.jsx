@@ -96,7 +96,16 @@ const DocumentUpload = ({ studentId, parentId, onUploadSuccess }) => {
             // Clear success message after 3 seconds
             setTimeout(() => setSuccess(''), 3000);
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to upload document');
+            const raw = err.response?.data?.message || '';
+            if (raw.toLowerCase().includes('not-null') || raw.toLowerCase().includes('null or transient')) {
+                setError('Upload failed: a required field is missing. Please ensure a file is selected and try again.');
+            } else if (raw.toLowerCase().includes('file size') || raw.toLowerCase().includes('too large')) {
+                setError('The file is too large. Please upload a file smaller than 5MB.');
+            } else if (raw) {
+                setError(raw);
+            } else {
+                setError('Failed to upload document. Please try again.');
+            }
         } finally {
             setLoading(false);
         }
